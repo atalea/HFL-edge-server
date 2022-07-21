@@ -103,5 +103,7 @@ app.use((error, req, res, next) => {
 });
 
 app.listen(PORT,()=>{
+    //on startup try to register with the central server
+    // callApi("central server ip and port" + "/register/edge-server" )
     console.log("listening on port: ", PORT);
 })
