@@ -81,7 +81,7 @@ app.put("/register/client", async (req, res, next) => {
   }
 })
 
-app.post("/api/upload", (req, res, next) => {
+app.post("/upload", (req, res, next) => {
   const form = formidable({ multiples: true })
 
   form.parse(req, (err, fields, files) => {
