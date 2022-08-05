@@ -1,4 +1,4 @@
-## set up
+# set up
 
 1. install node - lts
 2. install npm
