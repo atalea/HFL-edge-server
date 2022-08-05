@@ -13,23 +13,33 @@ app.use(cors())
 app.use(morgan("dev"))
 app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
-const { clients } = require("./clients.json")
 const { NetworkCount, callApi } = require("./util")
 // console.log(process);
-try {
-  //register itself with the central server
-  const response = axios({
-    url:"http://" + process.env.CENTRAL_SERVER + ":3001/register/edge-server",
-    headers:{
-      Authorization:"Bearer " + process.env.TOKEN
-    },
-    method:'PUT'
-  })
+
+const setup = async () => {
   
-  console.log(response?.data);
-} catch (error) {
-  console.log(error);
+  try {
+    const files = await fs.readdir(process.cwd())
+    if(files.filter(f=>f===".clients.json").length === 0) {
+      fs.writeFile("./.clients.json", JSON.stringify({ servers:[] }))
+    }
+    //register itself with the central server
+    const response = axios({
+      url:"http://" + process.env.CENTRAL_SERVER + ":3001/register/edge-server",
+      headers:{
+        Authorization:"Bearer " + process.env.TOKEN
+      },
+      method:'PUT'
+    })
+    
+    console.log(response?.data);
+  } catch (error) {
+    console.log(error);
+  }
 }
+
+setup()
+
   
 
 //require token
@@ -88,7 +98,7 @@ app.post("/recieve/train-clients", async (req, res, next) => {
         console.log('files :>> ', files);
       })
       //parse res into TF model
-      //determine if a client has dropped out
+      //determine if a client has dropped oreq.ipt
       results.push({id:i,fields,files})
       //aggregate current model with new model
     } catch (error) {
@@ -99,10 +109,14 @@ app.post("/recieve/train-clients", async (req, res, next) => {
 
 app.put("/register/client", async (req, res, next) => {
   console.log(req.ip)
+  const jsonData = await fs.readFile('./.edge-servers.json')
+  const {clients} = JSON.parse(jsonData)
   console.log(clients)
-  if (!clients.filter((ip) => req.ip == ip).length) {
-    clients.push(req.ip)
-    await fs.writeFile("./clients.json", JSON.stringify({ clients }))
+  const new_ip = req.ip.startsWith('::ffff:') ? req.ip.slice(7) : req.ip
+
+  if (!clients.filter((ip) => new_ip == ip).length) {
+    clients.push(new_ip)
+    await fs.writeFile("./.clients.json", JSON.stringify({ clients }))
     res.send("ip added!")
   } else {
     res.send("no ip added")
