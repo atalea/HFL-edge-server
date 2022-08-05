@@ -1,20 +1,25 @@
 ## set up
 
-- install node - lts
-- install npm
-- clone this repo
-
-- install dependencies
+1. install node - lts
+2. install npm
+3. clone this repo
+4. cd into repo
+5. install dependencies with:
 
 ```
 npm i
 ```
 
-- run 
+to start production server run: 
 ``` 
 npm start
 ```
-or
+or for devolpment run:
 ```
 npm run start:dev
+```
+
+after any git pulls make sure to run 
+```
+npm i
 ```
