@@ -21,7 +21,7 @@ const setup = async () => {
   try {
     const files = await fs.readdir(process.cwd())
     if(files.filter(f=>f===".clients.json").length === 0) {
-      fs.writeFile("./.clients.json", JSON.stringify({ servers:[] }))
+      fs.writeFile("./.clients.json", JSON.stringify({ clients:[] }))
     }
     //register itself with the central server
     const response = axios({
