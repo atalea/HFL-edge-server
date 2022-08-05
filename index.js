@@ -15,15 +15,22 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
 const { clients } = require("./clients.json")
 const { NetworkCount, callApi } = require("./util")
-
-
-//register itself with the central server
-const response = await callApi({
-  url:process.env.CENTRAL_SERVER,
-  token:process.env.CENTRAL_SERVER,
-  method:'POST'
-})
-console.log(response);
+// console.log(process);
+try {
+  //register itself with the central server
+  const response = axios({
+    url:"http://" + process.env.CENTRAL_SERVER + ":3001/register/edge-server",
+    headers:{
+      Authorization:"Bearer " + process.env.TOKEN
+    },
+    method:'PUT'
+  })
+  
+  console.log(response?.data);
+} catch (error) {
+  console.log(error);
+}
+  
 
 //require token
 app.use("*", (req, res, next) => {
@@ -134,4 +141,5 @@ app.listen(PORT,()=>{
     //on startup try to register with the central server
     // callApi("central server ip and port" + "/register/edge-server" )
     console.log("listening on port: ", PORT);
+    console.log(process.env.ip);
 })
