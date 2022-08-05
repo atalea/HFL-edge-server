@@ -16,6 +16,15 @@ app.use(express.urlencoded({ extended: false }))
 const { clients } = require("./clients.json")
 const { NetworkCount, callApi } = require("./util")
 
+
+//register itself with the central server
+const response = await callApi({
+  url:process.env.CENTRAL_SERVER,
+  token:process.env.CENTRAL_SERVER,
+  method:'POST'
+})
+console.log(response);
+
 //require token
 app.use("*", (req, res, next) => {
   const prefix = "Bearer "
@@ -49,19 +58,31 @@ app.post("/recieve/train-clients", async (req, res, next) => {
     }
   }
 
+  //send a request to each client for it to train its model n times.
   const results = []
   for (let i = 0; i < iterations.edge_server; i++) {
     try {
-      const res = await callApi({
+      const response = await callApi({
         url: `${ip}/receive/train-clients`,
         token,
         body: {
           iterations,
         },
       })
+      const form = formidable({ multiples: true })
+
+      form.parse(response, (err, fields, files) => {
+        if (err) {
+          next(err)
+          return
+        }
+        //parse the models that come back
+        console.log('fields :>> ', fields);
+        console.log('files :>> ', files);
+      })
       //parse res into TF model
       //determine if a client has dropped out
-      results.push(res)
+      results.push({id:i,fields,files})
       //aggregate current model with new model
     } catch (error) {
       console.error(error)
