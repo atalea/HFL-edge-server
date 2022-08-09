@@ -76,6 +76,7 @@ app.post("/recieve/train-clients", async (req, res, next) => {
   }
 
   //send a request to each client for it to train its model n times.
+  // send the data & model
   const results = []
   for (let i = 0; i < iterations.edge_server; i++) {
     try {
