@@ -109,7 +109,7 @@ app.post("/recieve/train-clients", async (req, res, next) => {
 
 app.put("/register/client", async (req, res, next) => {
   console.log(req.ip)
-  const jsonData = await fs.readFile('./.edge-servers.json')
+  const jsonData = await fs.readFile('./.clients.json')
   const {clients} = JSON.parse(jsonData)
   console.log(clients)
   const new_ip = req.ip.startsWith('::ffff:') ? req.ip.slice(7) : req.ip
