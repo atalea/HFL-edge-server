@@ -9,12 +9,41 @@ const axios = require('axios')
 const formidable = require("formidable")
 require("dotenv").config()
 const token = process.env.TOKEN
+const { createServer } = require('http')
+const { Server } = require("socket.io")
+const httpServer = createServer(app)
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*",
+    allowedHeaders: ["Authorization"],
+    credentials: false
+  }
+})
+const { NetworkCount, callApi } = require("./util")
 app.use(cors())
 app.use(morgan("dev"))
 app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
-const { NetworkCount, callApi } = require("./util")
 // console.log(process);
+io.on('connection', (sock)=>{
+  sock.on('disconnect', () =>{
+    console.log(`${sock.handshake.address} disconnected`);
+  })
+  sock.on('register', async () => {
+    const jsonData = await fs.readFile('./.clients.json')
+    const {clients} = JSON.parse(jsonData)
+    console.log(clients)
+    const new_ip = sock.handshake.address.startsWith('::ffff:') ? sock.handshake.address.slice(7) : sock.handshake.address
+  
+    if (!clients.filter((ip) => new_ip == ip).length) {
+      clients.push(new_ip)
+      await fs.writeFile("./.clients.json", JSON.stringify({ clients }))
+      sock.send('message', {msg : "ip added"})
+    } else {
+      sock.send('message', {msg : "ip not added"})
+    }
+  });
+});
 
 const setup = async () => {
   
@@ -31,21 +60,29 @@ const setup = async () => {
       },
       method:'PUT'
     })
-    
-    console.log(response?.data);
+    .then(function (response){
+      console.log(response?.data);
+    })
   } catch (error) {
     console.log(error);
   }
-}
+}  
 
-setup()
-
-  
-
+setup();
 //require token
 app.use("*", (req, res, next) => {
+  console.log("HERE");
   const prefix = "Bearer "
   const auth = req.header("Authorization")
+  if (!auth || auth.slice(prefix.length) != token) {
+    next({ error: "unauthorized user", message: "no access" })
+  }
+  next()
+})
+
+io.use((socket, next) => {
+  const prefix = "Bearer "
+  const auth = socket.handshake.headers.authorization
   if (!auth || auth.slice(prefix.length) != token) {
     next({ error: "unauthorized user", message: "no access" })
   }
@@ -106,23 +143,7 @@ app.post("/recieve/train-clients", async (req, res, next) => {
       console.error(error)
     }
   }
-})
-
-app.put("/register/client", async (req, res, next) => {
-  console.log(req.ip)
-  const jsonData = await fs.readFile('./.clients.json')
-  const {clients} = JSON.parse(jsonData)
-  console.log(clients)
-  const new_ip = req.ip.startsWith('::ffff:') ? req.ip.slice(7) : req.ip
-
-  if (!clients.filter((ip) => new_ip == ip).length) {
-    clients.push(new_ip)
-    await fs.writeFile("./.clients.json", JSON.stringify({ clients }))
-    res.send("ip added!")
-  } else {
-    res.send("no ip added")
-  }
-})
+});
 
 app.post("/upload", (req, res, next) => {
   const form = formidable({ multiples: true })
@@ -137,7 +158,7 @@ app.post("/upload", (req, res, next) => {
 })
 
 app.get('/',(req,res,next)=>{
-    res.send("server do be running!")
+    res.send("server is running!")
 })
 
 app.use("*", (req, res, next) => {
@@ -152,9 +173,8 @@ app.use((error, req, res, next) => {
     console.error(error);
 });
 
-app.listen(PORT,()=>{
+httpServer.listen(PORT,()=>{
     //on startup try to register with the central server
     // callApi("central server ip and port" + "/register/edge-server" )
-    console.log("listening on port: ", PORT);
-    console.log(process.env.ip);
-})
+  console.log("listening on port: ", PORT);
+});
