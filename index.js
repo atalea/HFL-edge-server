@@ -25,16 +25,22 @@ app.use(morgan("dev"))
 app.use(express.json())
 app.use(express.urlencoded({ extended: false }))
 // console.log(process);
-io.on('connection', (sock)=>{
-  sock.on('disconnect', () =>{
-    console.log(`${sock.handshake.address} disconnected`);
+io.on('connection', async (sock)=>{ //crashes on disconnect
+  sock.on('disconnect', async () =>{
+    const jsonData = await fs.readFile('./.clients.json')
+    const {clients} = JSON.parse(jsonData)
+    const new_ip = sock.handshake.address.startsWith('::ffff:') ? sock.handshake.address.slice(7) : sock.handshake.address
+    const index = clients.indexOf(new_ip)
+    if(index > -1) { clients.splice(index, 1)}
+    else {console.log("client not found")}
+    await fs.writeFile("./.clients.json", JSON.stringify({ clients }))
+    console.log(`${new_ip} disconnected`);
   })
   sock.on('register', async () => {
     const jsonData = await fs.readFile('./.clients.json')
-    const {clients} = JSON.parse(jsonData)
-    console.log(clients)
+    const { clients } = JSON.parse(jsonData)
     const new_ip = sock.handshake.address.startsWith('::ffff:') ? sock.handshake.address.slice(7) : sock.handshake.address
-  
+    console.log("ip registered: ", new_ip);
     if (!clients.filter((ip) => new_ip == ip).length) {
       clients.push(new_ip)
       await fs.writeFile("./.clients.json", JSON.stringify({ clients }))
@@ -71,7 +77,6 @@ const setup = async () => {
 setup();
 //require token
 app.use("*", (req, res, next) => {
-  console.log("HERE");
   const prefix = "Bearer "
   const auth = req.header("Authorization")
   if (!auth || auth.slice(prefix.length) != token) {
@@ -92,56 +97,60 @@ io.use((socket, next) => {
 /**
  * entrypoint for testing.
  */
-app.post("/recieve/train-clients", async (req, res, next) => {
+app.post("/receive/train-clients", async (req, res, next) => {
+  const jsonData = await fs.readFile('./.clients.json')
+  const {clients} = JSON.parse(jsonData)
   const { iterations } = req.body
-  console.log(iterations)
-  //get viable edge-servers and clients
-  const viableClients = 0
-  for (let i = 0; i < clients.length; i++) {
-    const ip = clients[i]
-    try {
-      const res = await callApi({
-        url: `${ip}/send/viable`,
-        token,
-      })
-      const data = await res.json()
-      console.log(data)
-      viableClients++
-    } catch (error) {
-      console.error(error)
-    }
-  }
+  //get viable clients
+  // const viableClients = 0
+  // for (let i = 0; i < clients.length; i++) {
+  //   const ip = clients[i]
+  //   try {
+  //     const res = await callApi({
+  //       url: `${ip}/send/viable`,
+  //       token,
+  //     })
+  //     const data = await res.json()
+  //     console.log(data)
+  //     viableClients++
+  //   } catch (error) {
+  //     console.error(error)
+  //   }
+  // }
 
   //send a request to each client for it to train its model n times.
   // send the data & model
+  console.log("sending epic message")
   const results = []
   for (let i = 0; i < iterations.edge_server; i++) {
-    try {
-      const response = await callApi({
-        url: `${ip}/receive/train-clients`,
-        token,
-        body: {
-          iterations,
-        },
-      })
-      const form = formidable({ multiples: true })
+    io.emit("train", iterations);
+    //await io.on("upload-model", res)
+    // try {
+    //   const response = await callApi({
+    //     url: `${ip}/receive/train-clients`,
+    //     token,
+    //     body: {
+    //       iterations,
+    //     },
+    //   })
+    //   const form = formidable({ multiples: true })
 
-      form.parse(response, (err, fields, files) => {
-        if (err) {
-          next(err)
-          return
-        }
-        //parse the models that come back
-        console.log('fields :>> ', fields);
-        console.log('files :>> ', files);
-      })
+    //   form.parse(response, (err, fields, files) => {
+    //     if (err) {
+    //       next(err)
+    //       return
+    //     }
+    //     //parse the models that come back
+    //     console.log('fields :>> ', fields);
+    //     console.log('files :>> ', files);
+    //   })
       //parse res into TF model
       //determine if a client has dropped oreq.ipt
-      results.push({id:i,fields,files})
+      //results.push({id:i,fields,files})
       //aggregate current model with new model
-    } catch (error) {
-      console.error(error)
-    }
+    // } catch (error) {
+    //   console.error(error)
+    // }
   }
 });
 
@@ -158,7 +167,13 @@ app.post("/upload", (req, res, next) => {
 })
 
 app.get('/',(req,res,next)=>{
-    res.send("server is running!")
+    res.send({message: "server is running!"})
+})
+
+app.get('/send/viable', async (req,res,next)=>{
+  const jsonData = await fs.readFile('./.clients.json')
+  const {clients} = JSON.parse(jsonData)
+  res.send({clients: clients.length});
 })
 
 app.use("*", (req, res, next) => {
