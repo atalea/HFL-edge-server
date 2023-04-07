@@ -24,7 +24,7 @@ else{
     port = parseInt(process.argv[2]);
     h = process.argv[3];
 } 
-const host = "138.67.71.73";
+const host = "172.20.10.2";
 const central_server = `http://${h}:3000`;
 
 const server = {url: central_server, callback: `http://${host}:${port}`};
