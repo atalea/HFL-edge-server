@@ -1,4 +1,4 @@
 #!/bin/bash
-read -p "Enter Central Serve IP: " IP
-PublicIP=$(curl ifconfig.me)
-node edge/index.js "${ip}" "${PublicIP}"
+read -p "Enter Central Server IP: " IP
+host=$(curl ifconfig.me)
+node edge/index.js "${IP}" "${host}"
