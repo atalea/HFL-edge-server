@@ -1,3 +1,5 @@
+// Copyright (c) 2023 David Canaday
+
 const express = require('express');
 const multer  = require('multer');
 const { createServer } = require("http");
@@ -18,14 +20,15 @@ app.use(authMiddleware);
 app.use("/model", cors({origin: "*"}), express.static(path.join(__dirname, "model")));
 const upload = multer();
 
-var h, port;
-if (process.argv.length === 2) port = 3001;
+let port = 3001;
+let ip = null;
+let host = null;
+if (process.argv.length != 4) console.log("Error: all bat entries are required");
 else{
-    port = parseInt(process.argv[2]);
-    h = process.argv[3];
-} 
-const host = "172.20.10.2";
-const central_server = `http://${h}:3000`;
+    ip = process.argv[2];
+    host = process.argv[3];
+}
+const central_server = `http://${ip}:3000`;
 
 const server = {url: central_server, callback: `http://${host}:${port}`};
 const clients = {};
@@ -68,6 +71,19 @@ app.post('/download', async (req, res) => {
     console.log("Recieved model from Central Server");
 });
 
+const checkUpload = async () => {
+    const agg = await aggregate(clients);
+    if (agg){
+        edge_iterations[0] -= 1;
+        console.log("Edge server iteration complete!");
+        if (edge_iterations[0] > 0){
+            await sendDownstream(clients);
+        } else{
+            await sendUpstream(server);
+        }
+    }
+}
+
 app.post('/upload', cors({origin: "*"}), upload.fields([{ name: 'weights', maxCount: 1 }, { name: 'shape', maxCount: 1 }]), async (req, res) => {
     function convertTypedArray(src, type) {
         const buffer = new ArrayBuffer(src.byteLength);
@@ -87,16 +103,7 @@ app.post('/upload', cors({origin: "*"}), upload.fields([{ name: 'weights', maxCo
         ind += shape[i];
     }
     clients[sid].model = decoded;
-    const agg = await aggregate(clients);
-    if (agg){
-        edge_iterations[0] -= 1;
-        console.log("Edge server iteration complete!");
-        if (edge_iterations[0] > 0){
-            await sendDownstream(clients);
-        } else{
-            await sendUpstream(server);
-        }
-    }
+    await checkUpload();
 });
 
 io.on('connection', async (sock) => {
@@ -104,12 +111,12 @@ io.on('connection', async (sock) => {
     clients[sock.id] = {sock: sock};
     await apiPost(`${server.url}/status`, {url: server.callback, numClients: Object.keys(clients).length});
     sock.on('disconnect', async () => {
+        console.log(`Client disconnect: ${sock.handshake.address}!`);
         delete clients[sock.id];
         await apiPost(`${server.url}/status`, {url: server.callback, numClients: Object.keys(clients).length});
+        await checkUpload();
     });
-    sock.on('disconnect', () =>{
-        console.log("client disconnected");
-    });
+    //Maybe delete from dict when disconnect...
 });
 
 app.get('*', async (req, res) => {
@@ -117,5 +124,5 @@ app.get('*', async (req, res) => {
 });
 
 httpServer.listen(port, host, async () => {
-    console.log(`Edge Server running on port ${port}!`);
+    console.log(`Edge Server running on port ${host}:${port}!`);
 });

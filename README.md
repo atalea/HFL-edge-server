@@ -1,7 +1,8 @@
 # HFL-edge-server
-work in progress 
+work in progress
 
-run "npm i" after any pulls
-run start_edge.bat
-enter port to run on
-enter port of central server
+# Usage Instructions
+0. Ensure you are running NodeJS 18.X.X or above!
+1. Run 'npm i'
+2. Windows: run start_edge.bat
+   Linux: make sure start_edge.sh is executeable and run it
