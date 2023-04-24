@@ -49,7 +49,7 @@ const sendUpstream = async (server, metric) => {
     form.append('weights', weightBlob);
     form.append('shape', shapeBlob);
     form.append('url', server.callback);
-    form.append('metric', JSON.stringify({"metric": metric}));
+    form.append('metric', metric);
     const opt = {
         url: `${server.url}/upload`,
         method: "POST",
@@ -65,19 +65,21 @@ const sendUpstream = async (server, metric) => {
 const aggregate = async (clients) => {
     let numClients = 0;
     let edgeDataSize = 0;
+    const metric = [];
     for (let c in clients) {
         if (!clients[c].model) return false;
         numClients += 1;
         edgeDataSize += clients[c].data.data.size;
     } 
-    console.log(edgeDataSize);
     if (numClients <= 0) return false;
     //do learning
     ckeys = Object.keys(clients);
     aggregatedModel = Object.assign({},clients[ckeys[0]].model);
+    metric.push(clients[ckeys[0]].time.trainTime);
+    console.log("HERE", clients[ckeys[0]].time.trainTime);
     clients[ckeys[0]].model = false;
     for (let c = 1; c < ckeys.length; c+=1){
-        metric.push(clients[ckeys[c]].time);
+        metric.push(clients[ckeys[c]].time.trainTime);
         const cmodel = clients[ckeys[c]].model;
         for (let i = 0; i < cmodel.length; i+=1){
             for (let j = 0; j < cmodel[i].length; j+=1){

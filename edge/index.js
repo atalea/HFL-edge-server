@@ -7,7 +7,6 @@ var cors = require('cors')
 const tf = require('@tensorflow/tfjs-node');
 const { errorMiddleware, authMiddleware, sendDownstream, sendUpstream, aggregate, apiPost, TFRequest } = require('./util.js');
 const config = require('./config.js');
-
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {cors: {origin: '*'}});
