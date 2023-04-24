@@ -1,5 +1,4 @@
 const axios = require('axios');
-const BodyFormData = require('form-data');
 const tf = require('@tensorflow/tfjs-node');
 const path = require('path');
 
@@ -24,12 +23,12 @@ const apiPost = async (url, data) => {
         }
     };
     const response = await axios(opt).catch((err) => {
-        console.log(err);
+        console.warn("Retrying connection to central server");
     });
     return response;
 }
 
-const sendUpstream = async (server) => {
+const sendUpstream = async (server, metric) => {
     const umodel = await tf.loadLayersModel("file://" + path.join(__dirname, "model","model.json"));
     let weights = [];
     let shape = [];
@@ -50,6 +49,7 @@ const sendUpstream = async (server) => {
     form.append('weights', weightBlob);
     form.append('shape', shapeBlob);
     form.append('url', server.callback);
+    form.append('metric', JSON.stringify({"metric": metric}));
     const opt = {
         url: `${server.url}/upload`,
         method: "POST",
@@ -61,24 +61,30 @@ const sendUpstream = async (server) => {
     const response = await axios(opt);
 }
 
-//Sends data upstream if all clients have sent a model
+//Sends model upstream if all clients have sent a model
 const aggregate = async (clients) => {
     let numClients = 0;
+    let edgeDataSize = 0;
     for (let c in clients) {
         if (!clients[c].model) return false;
         numClients += 1;
+        edgeDataSize += clients[c].data.data.size;
     } 
+    console.log(edgeDataSize);
     if (numClients <= 0) return false;
     //do learning
     ckeys = Object.keys(clients);
     aggregatedModel = Object.assign({},clients[ckeys[0]].model);
     clients[ckeys[0]].model = false;
     for (let c = 1; c < ckeys.length; c+=1){
+        metric.push(clients[ckeys[c]].time);
         const cmodel = clients[ckeys[c]].model;
         for (let i = 0; i < cmodel.length; i+=1){
             for (let j = 0; j < cmodel[i].length; j+=1){
-                if (c == 1) aggregatedModel[i][j] /= numClients;
-                aggregatedModel[i][j] += cmodel[i][j]/numClients;
+                if (c == 1) aggregatedModel[i][j] = cmodel[i][j]*clients[ckeys[c]].data.data.size/edgeDataSize;
+                else{
+                    aggregatedModel[i][j] += cmodel[i][j]*clients[ckeys[c]].data.data.size/edgeDataSize;
+                }
             }
         }
         clients[ckeys[c]].model = false;
@@ -89,7 +95,7 @@ const aggregate = async (clients) => {
         layers[i].setWeights([tf.tensor(aggregatedModel[i*2], layers[i].kernel.shape), tf.tensor(aggregatedModel[i*2+1], layers[i].bias.shape)]);
     }
     await amodel.save("file://" + path.join(__dirname, "model"));
-    return true;
+    return metric;
 }
 
 const TFRequest = {requestInit: {headers: {'Authorization': `Bearer ${token}`}}};

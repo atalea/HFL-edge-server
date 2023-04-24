@@ -1,14 +1,12 @@
-// Copyright (c) 2023 David Canaday
-
 const express = require('express');
 const multer  = require('multer');
 const { createServer } = require("http");
 const { Server } = require("socket.io");
-const axios = require('axios');
 const path = require('path');
 var cors = require('cors')
 const tf = require('@tensorflow/tfjs-node');
 const { errorMiddleware, authMiddleware, sendDownstream, sendUpstream, aggregate, apiPost, TFRequest } = require('./util.js');
+const config = require('./config.js');
 
 const app = express();
 const httpServer = createServer(app);
@@ -20,25 +18,15 @@ app.use(authMiddleware);
 app.use("/model", cors({origin: "*"}), express.static(path.join(__dirname, "model")));
 const upload = multer();
 
-let port = 3001;
-let ip = null;
-let host = null;
-if (process.argv.length != 4) console.log("Error: all bat entries are required");
-else{
-    ip = process.argv[2];
-    host = process.argv[3];
-}
-const central_server = `http://${ip}:3000`;
-
-const server = {url: central_server, callback: `http://${host}:${port}`};
 const clients = {};
 let edge_iterations;
+let training_in_progress = false;
 
 const setup = async () => {
     let connected = false;
     while (!connected){
-        const reponse = await apiPost(`${server.url}/register`, {url: server.callback});
-        if (reponse.status == 200){
+        const reponse = await apiPost(`${config.server.url}/register`, {url: config.server.callback});
+        if (reponse?.status == 200){
             connected = true;
         }
     }
@@ -52,12 +40,13 @@ app.get('/', async (req, res) => {
 });
 
 app.post('/download', async (req, res) => {
+    training_in_progress = true;
     res.json({message: 'model received'});
     const model = req.body;
     const fmodel = await tf.loadLayersModel(model.model, TFRequest);
     await fmodel.save("file://" + path.join(__dirname, "model"));
-    model.model = `http://${host}:${port}/model/model.json`;
-    model.callback = `http://${host}:${port}/upload`;
+    model.model = config.client.model;
+    model.callback = config.client.callback;
     edge_iterations = model.iterations;
     model.iterations = model.iterations[1];
     let i = 0;
@@ -79,7 +68,8 @@ const checkUpload = async () => {
         if (edge_iterations[0] > 0){
             await sendDownstream(clients);
         } else{
-            await sendUpstream(server);
+            await sendUpstream(config.server, agg);
+            training_in_progress = false;
         }
     }
 }
@@ -93,6 +83,7 @@ app.post('/upload', cors({origin: "*"}), upload.fields([{ name: 'weights', maxCo
     res.json({message: 'received trained model'});
     console.log("Received trained model from client");
     const sid = req.body.sid;
+    const timeMetric = JSON.parse(req.body.time);
     let decoded = [];
     let ind = 0;
     // Maybe label these with multer...
@@ -103,17 +94,22 @@ app.post('/upload', cors({origin: "*"}), upload.fields([{ name: 'weights', maxCo
         ind += shape[i];
     }
     clients[sid].model = decoded;
+    clients[sid].time = timeMetric;
     await checkUpload();
 });
 
 io.on('connection', async (sock) => {
+    if (training_in_progress) {
+        sock.emit('message', 'failed to register - training in progress!');
+        return false;
+    }
     console.log("Client connected!");
     clients[sock.id] = {sock: sock};
-    await apiPost(`${server.url}/status`, {url: server.callback, numClients: Object.keys(clients).length});
+    await apiPost(`${config.server.url}/status`, {url: config.server.callback, numClients: Object.keys(clients).length});
     sock.on('disconnect', async () => {
         console.log(`Client disconnect: ${sock.handshake.address}!`);
         delete clients[sock.id];
-        await apiPost(`${server.url}/status`, {url: server.callback, numClients: Object.keys(clients).length});
+        await apiPost(`${config.server.url}/status`, {url: config.server.callback, numClients: Object.keys(clients).length});
         await checkUpload();
     });
     //Maybe delete from dict when disconnect...
@@ -123,6 +119,6 @@ app.get('*', async (req, res) => {
     res.send("Page Not Found!");
 });
 
-httpServer.listen(port, host, async () => {
-    console.log(`Edge Server running on port ${host}:${port}!`);
+httpServer.listen(config.port, config.host, async () => {
+    console.log(`Edge Server running on port ${config.host}:${config.port}!`);
 });

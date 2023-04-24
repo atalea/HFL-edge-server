@@ -1,6 +1,6 @@
 title = Edge Server
 @echo off
-set /p "host=Enter central IP: "
-for /f %%a in ('powershell Invoke-RestMethod api.ipify.org') do set PublicIP=%%a
-node edge\index.js %host% %PublicIP%
+set /p "HOST=Enter Local IP for edge to run on: "
+set /p "CENTRAL_SERVER=Enter Central Server IP: "
+node edge\index.js
 pause
