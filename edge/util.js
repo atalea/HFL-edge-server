@@ -75,8 +75,7 @@ const aggregate = async (clients) => {
     //do learning
     ckeys = Object.keys(clients);
     aggregatedModel = Object.assign({},clients[ckeys[0]].model);
-    metric.push(clients[ckeys[0]].time.trainTime);
-    console.log("HERE", clients[ckeys[0]].time.trainTime);
+    metric.push(clients[ckeys[0]].time);
     clients[ckeys[0]].model = false;
     for (let c = 1; c < ckeys.length; c+=1){
         metric.push(clients[ckeys[c]].time.trainTime);

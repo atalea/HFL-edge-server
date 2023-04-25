@@ -82,7 +82,8 @@ app.post('/upload', cors({origin: "*"}), upload.fields([{ name: 'weights', maxCo
     res.json({message: 'received trained model'});
     console.log("Received trained model from client");
     const sid = req.body.sid;
-    const timeMetric = JSON.parse(req.body.time);
+    console.log("Computation time: ", req.body.comp_time);
+    const timeMetric = JSON.parse(req.body.comp_time);
     let decoded = [];
     let ind = 0;
     // Maybe label these with multer...
